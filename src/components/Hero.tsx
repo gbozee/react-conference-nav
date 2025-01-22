@@ -3,14 +3,11 @@ import { Button } from "./ui/button";
 const Hero = () => {
   return (
     <div className="relative min-h-screen">
-      {/* Background image with overlay */}
+      {/* Background with gradient overlay - replace backgroundImage with your custom image later */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: "url('/lovable-uploads/aca67f92-f6bb-427c-98b0-ef43bba4fc54.png')",
-        }}
+        className="absolute inset-0 bg-gradient-to-br from-navbar via-blue-900 to-navbar bg-cover bg-center bg-no-repeat"
       >
-        <div className="absolute inset-0 bg-navbar/80" /> {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/50" /> {/* Dark overlay */}
       </div>
 
       {/* Content */}
