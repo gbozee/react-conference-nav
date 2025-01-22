@@ -8,10 +8,8 @@ const Index = () => {
     <div className="min-h-screen bg-white">
       <Navbar />
       <Hero />
-      <div className="container mx-auto px-4">
-        <AboutSection />
-        <VideoSection />
-      </div>
+      <AboutSection />
+      <VideoSection />
     </div>
   );
 };
