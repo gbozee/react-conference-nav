@@ -4,6 +4,7 @@ import AboutSection from "../components/AboutSection";
 import VideoSection from "../components/VideoSection";
 import ScheduleSection from "../components/ScheduleSection";
 import SpeakerSection from "../components/SpeakerSection";
+import TicketSection from "../components/TicketSection";
 
 const Index = () => {
   return (
@@ -14,6 +15,7 @@ const Index = () => {
       <VideoSection />
       <SpeakerSection />
       <ScheduleSection />
+      <TicketSection />
     </div>
   );
 };
