@@ -7,6 +7,7 @@ import SpeakerSection from "../components/SpeakerSection";
 import TicketSection from "../components/TicketSection";
 import SponsorsSection from "../components/SponsorsSection";
 import CTASection from "../components/CTASection";
+import VenueSection from "../components/VenueSection";
 
 const Index = () => {
   return (
@@ -20,6 +21,7 @@ const Index = () => {
       <TicketSection />
       <SponsorsSection />
       <CTASection />
+      <VenueSection />
     </div>
   );
 };
