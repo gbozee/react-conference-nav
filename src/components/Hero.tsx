@@ -27,16 +27,15 @@ const Hero = () => {
             <div className="text-2xl font-bold text-white mb-2">
               December 27, 2021
             </div>
-            <div className="text-white/80">
+            <div className="text-white/80 mb-4">
               Garuda Wisnu Kencana Cultural Park, Jl. RayaUluwatu, Kuta,Badung, Bali Indonesia
             </div>
+            <Button 
+              className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-6 text-lg h-auto w-full"
+            >
+              GET TICKET
+            </Button>
           </div>
-
-          <Button 
-            className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-6 text-lg h-auto"
-          >
-            GET TICKET
-          </Button>
         </div>
       </div>
     </div>
