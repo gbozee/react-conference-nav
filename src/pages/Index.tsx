@@ -2,6 +2,7 @@ import Navbar from "../components/Navbar";
 import Hero from "../components/Hero";
 import AboutSection from "../components/AboutSection";
 import VideoSection from "../components/VideoSection";
+import ScheduleSection from "../components/ScheduleSection";
 
 const Index = () => {
   return (
@@ -10,6 +11,7 @@ const Index = () => {
       <Hero />
       <AboutSection />
       <VideoSection />
+      <ScheduleSection />
     </div>
   );
 };
