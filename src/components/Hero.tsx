@@ -2,7 +2,7 @@ import { Button } from "./ui/button";
 
 const Hero = () => {
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen pt-16"> {/* Added pt-16 for navbar height */}
       {/* Background with gradient overlay - replace backgroundImage with your custom image later */}
       <div 
         className="absolute inset-0 bg-gradient-to-br from-navbar via-blue-900 to-navbar bg-cover bg-center bg-no-repeat"
