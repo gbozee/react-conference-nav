@@ -8,6 +8,7 @@ import TicketSection from "../components/TicketSection";
 import SponsorsSection from "../components/SponsorsSection";
 import CTASection from "../components/CTASection";
 import VenueSection from "../components/VenueSection";
+import Footer from "../components/Footer";
 
 const Index = () => {
   return (
@@ -22,6 +23,7 @@ const Index = () => {
       <SponsorsSection />
       <CTASection />
       <VenueSection />
+      <Footer />
     </div>
   );
 };
