@@ -10,13 +10,15 @@ import SponsorsSection from "@/components/SponsorsSection";
 import TicketSection from "@/components/TicketSection";
 import VenueSection from "@/components/VenueSection";
 import VideoSection from "@/components/VideoSection";
-import Image from "next/image";
+import HeroBackground from "@/components/HeroBackground";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
-      <Hero />
+    <div className="min-h-screen bg-white dark:bg-gray-900">
+      <HeroBackground>
+        <Navbar />
+        <Hero />
+      </HeroBackground>
       <AboutSection />
       <VideoSection />
       <SpeakerSection />
