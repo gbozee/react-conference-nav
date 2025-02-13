@@ -1,4 +1,11 @@
-import { Client, Account, Databases, Storage, Functions } from "node-appwrite";
+import {
+  Client,
+  Account,
+  Databases,
+  Storage,
+  Functions,
+  Users,
+} from "node-appwrite";
 
 const APPWRITE_CONFIG = {
   endpoint: process.env.APPWRITE_ENDPOINT || "",
@@ -21,6 +28,9 @@ export async function createAdminClient() {
   return {
     get accountClient() {
       return new Account(accountClient);
+    },
+    get users() {
+      return new Users(client);
     },
     get account() {
       return new Account(client);

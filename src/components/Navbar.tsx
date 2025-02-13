@@ -1,16 +1,37 @@
-'use client'
-import { useState } from "react";
+"use client";
+
+import Logo from "@/public/pycon2024.svg";
 import { Menu } from "lucide-react";
-import Link from "next/link";
 import Image from "next/image";
-import Logo from '@/public/pycon2024.svg'
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import ThemeToggle from "./ThemeToggle";
 import LoginModal from "./auth/LoginModal";
+
+const SESSION_ID = process.env.APP_SESSION_ID_NAME || "my-custom-session";
+
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // Check if session exists
+    const checkAuth = async () => {
+      try {
+        const sessionCookie = document.cookie
+          .split("; ")
+          .find((row) => row.startsWith(SESSION_ID));
+        setIsAuthenticated(!!sessionCookie);
+      } catch (error) {
+        console.error("Auth check error:", error);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   const navItems = [
     { name: "Home", path: "/" },
@@ -77,7 +98,7 @@ const Navbar = () => {
                   {item.hasDropdown && (
                     <svg
                       className={`w-3 h-3 transition-transform duration-200 ${
-                        activeDropdown === item.name ? 'rotate-180' : ''
+                        activeDropdown === item.name ? "rotate-180" : ""
                       }`}
                       viewBox="0 0 12 12"
                       fill="none"
@@ -93,7 +114,7 @@ const Navbar = () => {
                     </svg>
                   )}
                 </button>
-                
+
                 {/* Dropdown Menu */}
                 {item.hasDropdown && activeDropdown === item.name && (
                   <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50">
@@ -116,21 +137,44 @@ const Navbar = () => {
           </div>
 
           {/* Auth Buttons and Theme Toggle */}
-          <div className="hidden md:flex items-center space-x-4">
-            <ThemeToggle />
-            <button
-              onClick={() => setIsLoginModalOpen(true)}
-              className="font-bold text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 transition-colors"
-            >
-              Login
-            </button>
-            <Link
-              href="/signup"
-              className="font-bold bg-[#003333] text-white px-6 py-2 rounded-full hover:bg-green-800 transition-colors"
-            >
-              Sign up
-            </Link>
-          </div>
+          {!isAuthenticated ? (
+            <div className="hidden md:flex items-center gap-4">
+              <Link
+                href="/login"
+                className="font-bold text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 transition-colors"
+              >
+                Login
+              </Link>
+              <Link
+                href="/signup"
+                className="font-bold bg-[#003333] text-white px-6 py-2 rounded-full hover:bg-green-800 transition-colors"
+              >
+                Sign up
+              </Link>
+            </div>
+          ) : (
+            <div className="hidden md:flex items-center gap-4">
+              <Link
+                href="/dashboard"
+                className="font-bold text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 transition-colors"
+              >
+                Dashboard
+              </Link>
+              <button
+                onClick={async () => {
+                  const response = await fetch("/api/auth/logout", {
+                    method: "POST",
+                  });
+                  if (response.ok) {
+                    window.location.href = "/";
+                  }
+                }}
+                className="font-bold text-red-600 hover:text-red-700 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          )}
 
           {/* Mobile Menu Button and Theme Toggle */}
           <div className="md:hidden flex items-center space-x-2">
@@ -151,14 +195,16 @@ const Navbar = () => {
                 {navItems.map((item) => (
                   <div key={item.name}>
                     <button
-                      onClick={() => item.hasDropdown && toggleDropdown(item.name)}
+                      onClick={() =>
+                        item.hasDropdown && toggleDropdown(item.name)
+                      }
                       className="font-bold text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 transition-colors flex items-center gap-1 w-full"
                     >
                       {item.name}
                       {item.hasDropdown && (
                         <svg
                           className={`w-3 h-3 transition-transform duration-200 ${
-                            activeDropdown === item.name ? 'rotate-180' : ''
+                            activeDropdown === item.name ? "rotate-180" : ""
                           }`}
                           viewBox="0 0 12 12"
                           fill="none"
@@ -174,7 +220,7 @@ const Navbar = () => {
                         </svg>
                       )}
                     </button>
-                    
+
                     {/* Mobile Dropdown */}
                     {item.hasDropdown && activeDropdown === item.name && (
                       <div className="pl-4 mt-2 space-y-2">
@@ -215,7 +261,7 @@ const Navbar = () => {
         </div>
       </nav>
 
-      <LoginModal 
+      <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
       />
