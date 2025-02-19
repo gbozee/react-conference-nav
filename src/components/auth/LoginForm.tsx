@@ -4,27 +4,18 @@ import { Eye, EyeOff } from 'lucide-react'
 import Image from 'next/image'
 import Logo from '@/public/pycon2024.svg'
 import Link from 'next/link'
-import { login, signUp, sendOTP, verifySignUpOTP } from '@/lib/actions/auth'
+import { login, signUp, sendOTP, verifySignUpOTP, sendPasswordRecovery, loginWithPassword, type AuthResult } from '@/lib/actions/auth'
 import { useRouter, usePathname } from 'next/navigation'
 
 type ValidationErrors = {
   email?: string;
+  password?: string;
   otp?: string;
 };
 
-interface AuthResult {
-  success: boolean;
-  error?: string;
-  message?: string;
-  userId?: string | null;
-  email?: string;
-  needsVerification?: boolean;
-  data?: any;
-}
-
 interface VerificationState {
   isVerifying: boolean;
-  userId: string | null;
+  userId: string | undefined;
   email: string;
   otp: string;
 }
@@ -43,12 +34,14 @@ export default function LoginForm({
   const [isPending, startTransition] = useTransition()
   const [verificationState, setVerificationState] = useState<VerificationState>({
     isVerifying: false,
-    userId: null,
+    userId: undefined,
     email: '',
     otp: ''
   })
+  const [showPassword, setShowPassword] = useState(false)
   const [otpTimer, setOtpTimer] = useState<number>(0)
   const [canResendOTP, setCanResendOTP] = useState<boolean>(true)
+  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password')
   
   const router = useRouter()
   const pathname = usePathname()
@@ -78,6 +71,7 @@ export default function LoginForm({
   const validateForm = (formData: FormData): boolean => {
     const errors: ValidationErrors = {};
     const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
     const otp = formData.get('otp') as string;
 
     if (!verificationState.isVerifying) {
@@ -85,6 +79,12 @@ export default function LoginForm({
         errors.email = 'Email is required';
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         errors.email = 'Please enter a valid email address';
+      }
+
+      if (loginMethod === 'password' && !isSignupPage) {
+        if (!password) {
+          errors.password = 'Password is required';
+        }
       }
     } else {
       if (!otp) {
@@ -108,7 +108,7 @@ export default function LoginForm({
       } else if (result.userId) {
         setVerificationState(prev => ({
           ...prev,
-          userId: result.userId
+          userId: result.userId || undefined
         }));
         setOtpTimer(60);
         setCanResendOTP(false);
@@ -120,7 +120,7 @@ export default function LoginForm({
   const handleChangeEmail = () => {
     setVerificationState({
       isVerifying: false,
-      userId: null,
+      userId: undefined,
       email: '',
       otp: ''
     });
@@ -128,7 +128,22 @@ export default function LoginForm({
     setCanResendOTP(true);
     setError(null);
   };
-  
+
+  const handleForgotPassword = async (email: string) => {
+    startTransition(async () => {
+      try {
+        const result = await sendPasswordRecovery(email);
+        if (result.success) {
+          setError('Password recovery email sent. Please check your inbox.');
+        } else {
+          setError(result.error || 'Failed to send recovery email.');
+        }
+      } catch (err) {
+        setError('An unexpected error occurred.');
+      }
+    });
+  };
+
   const handleSubmit = async (formData: FormData) => {
     setError(null);
     setValidationErrors({});
@@ -161,26 +176,38 @@ export default function LoginForm({
           }
         } else {
           // Handle initial login/signup
-          const action = isSignupPage ? signUp : login;
+          const action = isSignupPage ? signUp : (loginMethod === 'password' ? loginWithPassword : login);
           const result = await action(formData);
           
           if (result.success) {
-            setVerificationState({
-              isVerifying: true,
-              userId: result.userId!,
-              email: result.email || formData.get('email') as string,
-              otp: ''
-            });
-            setOtpTimer(60);
-            setCanResendOTP(false);
-            if (result.message) {
-              setError(null);
+            if (loginMethod === 'password' && !isSignupPage) {
+              // Password login successful, refresh and redirect
+              router.refresh();
+              if (onSuccess) {
+                onSuccess();
+              } else if (result.redirect) {
+                router.push(result.redirect);
+              }
+            } else {
+              // OTP flow
+              setVerificationState({
+                isVerifying: true,
+                userId: result.userId!,
+                email: result.email || formData.get('email') as string,
+                otp: ''
+              });
+              setOtpTimer(60);
+              setCanResendOTP(false);
+              if (result.message) {
+                setError(null);
+              }
             }
           } else {
             setError(result.error || 'An error occurred. Please try again.');
           }
         }
       } catch (err) {
+        console.log(err)
         setError('An unexpected error occurred. Please try again.');
       }
     });
@@ -289,7 +316,7 @@ export default function LoginForm({
         <p className="text-gray-600 text-center">
           {isSignupPage 
             ? 'Enter your email to create an account'
-            : 'Enter your email to sign in'}
+            : 'Sign in to your account'}
         </p>
         {error && (
           <p className="text-red-500 text-sm mt-2">{error}</p>
@@ -314,12 +341,70 @@ export default function LoginForm({
           )}
         </div>
 
+        {!isSignupPage && (
+          <>
+            {loginMethod === 'password' && (
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const emailInput = document.querySelector('input[name="email"]') as HTMLInputElement;
+                      if (emailInput?.value) {
+                        handleForgotPassword(emailInput.value);
+                      } else {
+                        setError('Please enter your email address first');
+                      }
+                    }}
+                    className="text-sm text-green-600 hover:text-green-700"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    className={`w-full px-3 py-2 border ${
+                      validationErrors.password ? 'border-red-500' : 'border-gray-300'
+                    } rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900 pr-10`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+                {validationErrors.password && (
+                  <p className="text-red-500 text-xs mt-1">{validationErrors.password}</p>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setLoginMethod(loginMethod === 'password' ? 'otp' : 'password')}
+                className="text-sm text-green-600 hover:text-green-700"
+              >
+                {loginMethod === 'password' ? 'Use one-time code' : 'Use password'}
+              </button>
+            </div>
+          </>
+        )}
+
         <button
           type="submit"
           disabled={isPending}
           className="w-full bg-[#003333] text-white py-2 rounded-md hover:bg-green-800 transition-colors font-bold disabled:opacity-50"
         >
-          {isPending ? 'Please wait...' : 'Continue with Email'}
+          {isPending ? 'Please wait...' : (loginMethod === 'password' ? 'Sign In' : 'Continue with Email')}
         </button>
 
         <div className="text-center text-sm">

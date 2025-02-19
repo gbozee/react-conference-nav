@@ -8,7 +8,22 @@ import { redirect } from "next/navigation";
 // Add type for cookie store
 type CookieStore = ReturnType<typeof cookies>;
 
-export async function signUp(formData: FormData) {
+// Add these type definitions at the top of the file
+export type AuthResult = {
+  success: boolean;
+  error?: string;
+  redirect?: string;
+  userId?: string | null;
+  email?: string;
+  message?: string;
+  needsVerification?: boolean;
+  code?: number;
+};
+
+// Add this near the top of the file with other constants
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+export async function signUp(formData: FormData): Promise<AuthResult> {
   try {
     const email = formData.get("email") as string;
     const password = ID.unique(); // Generate a random password for the user
@@ -59,7 +74,7 @@ export async function signUp(formData: FormData) {
   }
 }
 
-export async function login(formData: FormData) {
+export async function login(formData: FormData): Promise<AuthResult> {
   try {
     const email = formData.get("email") as string;
 
@@ -185,7 +200,7 @@ export async function createSession(
   }
 }
 
-export async function sendOTP(email: string) {
+export async function sendOTP(email: string): Promise<AuthResult> {
   const { users, account } = await createAdminClient();
   try {
     // check if the user exists.
@@ -199,7 +214,7 @@ export async function sendOTP(email: string) {
           success: true,
           userId: sessionToken.userId, 
           email,
-          error: null 
+          error: undefined
         };
       } catch (error) {
         console.error("Error creating email token:", error);
@@ -207,27 +222,28 @@ export async function sendOTP(email: string) {
           return { 
             success: false,
             error: error.message,
-            userId: null 
+            userId: undefined 
           };
         }
         return { 
           success: false,
           error: "Failed to send login code",
-          userId: null 
+          userId: undefined 
         };
       }
     }
     return { 
       success: false,
       error: "No account found with this email address",
-      userId: null 
+      userId: undefined,
+      email: undefined
     };
   } catch (error) {
     console.error("Error in sendOTP:", error);
     return { 
       success: false,
       error: "An unexpected error occurred",
-      userId: null 
+      userId: undefined 
     };
   }
 }
@@ -241,7 +257,7 @@ export async function verifySignUpOTP(
     otp: string;
   },
   nextUrl = "/"
-) {
+): Promise<AuthResult> {
   try {
     const sessionResult = await createSession(userId, otp);
     
@@ -285,4 +301,129 @@ export async function getAuthStatus() {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get('sessionId');
   return { isAuthenticated: !!sessionId };
+}
+
+export async function loginWithPassword(formData: FormData): Promise<AuthResult> {
+  try {
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    
+    const { accountClient, users } = await createAdminClient();
+    console.log({email,password})
+
+    try {
+      // First check if user exists
+      const existingUsers = await users.list([Query.equal("email", email)]);
+      
+      if (existingUsers.total === 0) {
+        return {
+          success: false,
+          error: "No account found with this email address. Please sign up."
+        };
+      }
+      // Attempt to login with email/password using accountClient
+      const session = await accountClient.createEmailPasswordSession(
+        email,
+        password
+      );
+      
+      // If successful, set the session cookie
+      const cookieStore = await cookies();
+      cookieStore.set("sessionId", session.$id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7, // 1 week
+        path: "/"
+      });
+
+      return {
+        success: true,
+        redirect: "/"
+      };
+    } catch (error) {
+      console.error("Login attempt error:", error);
+      if (error instanceof AppwriteException) {
+        if (error.code === 401) {
+          return {
+            success: false,
+            error: "Invalid email or password"
+          };
+        }
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to login"
+    };
+  }
+}
+
+export async function sendPasswordRecovery(email: string) {
+  try {
+    const { accountClient } = await createAdminClient();
+    
+    // Create password recovery using environment variable
+    await accountClient.createRecovery(email, `${APP_URL}/reset-password`);
+    
+    return {
+      success: true,
+      message: "Password recovery email sent"
+    };
+  } catch (error) {
+    console.error("Password recovery error:", error);
+    if (error instanceof AppwriteException) {
+      if (error.code === 404) {
+        return {
+          success: false,
+          error: "No account found with this email address"
+        };
+      }
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+    return {
+      success: false,
+      error: "Failed to send password recovery email"
+    };
+  }
+}
+
+export async function resetPassword(
+  userId: string,
+  secret: string,
+  password: string
+) {
+  try {
+    const { accountClient } = await createAdminClient();
+    
+    // Complete the password recovery
+    await accountClient.updateRecovery(userId, secret, password);
+    
+    return {
+      success: true,
+      message: "Password has been reset successfully"
+    };
+  } catch (error) {
+    console.error("Password reset error:", error);
+    if (error instanceof AppwriteException) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+    return {
+      success: false,
+      error: "Failed to reset password"
+    };
+  }
 }
