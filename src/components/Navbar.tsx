@@ -1,37 +1,43 @@
 "use client";
 
 import Logo from "@/public/pycon2024.svg";
-import { Menu } from "lucide-react";
+import { Menu, LogOut } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ThemeToggle from "./ThemeToggle";
 import LoginModal from "./auth/LoginModal";
+import { logout } from "@/lib/actions/auth";
+import { useRouter } from "next/navigation";
 
 const SESSION_ID = process.env.APP_SESSION_ID_NAME || "my-custom-session";
 
+interface NavbarProps {
+  initialAuthState: boolean;
+}
 
-const Navbar = () => {
+export default function Navbar({ initialAuthState }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(initialAuthState);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const router = useRouter();
 
-  useEffect(() => {
-    // Check if session exists
-    const checkAuth = async () => {
-      try {
-        const sessionCookie = document.cookie
-          .split("; ")
-          .find((row) => row.startsWith(SESSION_ID));
-        setIsAuthenticated(!!sessionCookie);
-      } catch (error) {
-        console.error("Auth check error:", error);
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const result = await logout();
+      if (result.success) {
+        setIsAuthenticated(false);
+        router.refresh();
       }
-    };
-
-    checkAuth();
-  }, []);
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const navItems = [
     { name: "Home", path: "/" },
@@ -100,173 +106,141 @@ const Navbar = () => {
                       className={`w-3 h-3 transition-transform duration-200 ${
                         activeDropdown === item.name ? "rotate-180" : ""
                       }`}
-                      viewBox="0 0 12 12"
                       fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
                       <path
-                        d="M2.5 4.5L6 8L9.5 4.5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
                       />
                     </svg>
                   )}
                 </button>
 
-                {/* Dropdown Menu */}
+                {/* Dropdown menu */}
                 {item.hasDropdown && activeDropdown === item.name && (
-                  <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50">
-                    {item.dropdownItems?.map((dropdownItem) => (
-                      <Link
-                        key={dropdownItem.name}
-                        href={dropdownItem.path}
-                        className="block px-4 py-2 text-sm text-[#003333] dark:text-white hover:bg-green-50 dark:hover:bg-gray-700 font-medium"
-                        onClick={() => {
-                          closeDropdowns();
-                        }}
-                      >
-                        {dropdownItem.name}
-                      </Link>
-                    ))}
+                  <div className="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
+                    <div
+                      className="py-1"
+                      role="menu"
+                      aria-orientation="vertical"
+                      aria-labelledby="options-menu"
+                    >
+                      {item.dropdownItems?.map((dropdownItem) => (
+                        <Link
+                          key={dropdownItem.name}
+                          href={dropdownItem.path}
+                          className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          role="menuitem"
+                          onClick={() => setActiveDropdown(null)}
+                        >
+                          {dropdownItem.name}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
             ))}
-          </div>
 
-          {/* Auth Buttons and Theme Toggle */}
-          {!isAuthenticated ? (
-            <div className="hidden md:flex items-center gap-4">
-              <Link
-                href="/login"
-                className="font-bold text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                href="/signup"
-                className="font-bold bg-[#003333] text-white px-6 py-2 rounded-full hover:bg-green-800 transition-colors"
-              >
-                Sign up
-              </Link>
-            </div>
-          ) : (
-            <div className="hidden md:flex items-center gap-4">
-              <Link
-                href="/dashboard"
-                className="font-bold text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 transition-colors"
-              >
-                Dashboard
-              </Link>
-              <button
-                onClick={async () => {
-                  const response = await fetch("/api/auth/logout", {
-                    method: "POST",
-                  });
-                  if (response.ok) {
-                    window.location.href = "/";
-                  }
-                }}
-                className="font-bold text-red-600 hover:text-red-700 transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          )}
-
-          {/* Mobile Menu Button and Theme Toggle */}
-          <div className="md:hidden flex items-center space-x-2">
-            <ThemeToggle />
-            <button
-              className="text-[#003333] dark:text-white"
-              onClick={() => setIsOpen(!isOpen)}
-              aria-label="Toggle menu"
-            >
-              <Menu size={24} />
-            </button>
-          </div>
-
-          {/* Mobile Navigation */}
-          {isOpen && (
-            <div className="absolute top-full left-0 right-0 bg-white/95 dark:bg-gray-900/95 md:hidden">
-              <div className="flex flex-col space-y-4 px-4 py-6">
-                {navItems.map((item) => (
-                  <div key={item.name}>
-                    <button
-                      onClick={() =>
-                        item.hasDropdown && toggleDropdown(item.name)
-                      }
-                      className="font-bold text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 transition-colors flex items-center gap-1 w-full"
-                    >
-                      {item.name}
-                      {item.hasDropdown && (
-                        <svg
-                          className={`w-3 h-3 transition-transform duration-200 ${
-                            activeDropdown === item.name ? "rotate-180" : ""
-                          }`}
-                          viewBox="0 0 12 12"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M2.5 4.5L6 8L9.5 4.5"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                    </button>
-
-                    {/* Mobile Dropdown */}
-                    {item.hasDropdown && activeDropdown === item.name && (
-                      <div className="pl-4 mt-2 space-y-2">
-                        {item.dropdownItems?.map((dropdownItem) => (
-                          <Link
-                            key={dropdownItem.name}
-                            href={dropdownItem.path}
-                            className="block text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 text-sm font-medium"
-                            onClick={() => {
-                              closeDropdowns();
-                              setIsOpen(false);
-                            }}
-                          >
-                            {dropdownItem.name}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <Link
-                  href="/login"
+            <div className="flex items-center space-x-4">
+              <ThemeToggle />
+              {isAuthenticated ? (
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex items-center gap-2 font-bold text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 transition-colors"
+                >
+                  <LogOut size={20} />
+                  {isLoggingOut ? 'Logging out...' : 'Logout'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
                   className="font-bold text-[#003333] dark:text-white hover:text-green-700 dark:hover:text-green-400 transition-colors"
-                  onClick={() => setIsOpen(false)}
                 >
                   Login
-                </Link>
-                <Link
-                  href="/signup"
-                  className="font-bold bg-[#003333] text-white px-6 py-2 rounded-full hover:bg-green-800 transition-colors inline-block text-center"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Sign up
-                </Link>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="md:hidden text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-green-500"
+          >
+            <Menu size={24} />
+          </button>
+        </div>
+
+        {/* Mobile menu */}
+        {isOpen && (
+          <div className="md:hidden">
+            <div className="px-2 pt-2 pb-3 space-y-1">
+              {navItems.map((item) => (
+                <div key={item.name}>
+                  <button
+                    onClick={() => item.hasDropdown && toggleDropdown(item.name)}
+                    className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    {item.name}
+                  </button>
+                  {item.hasDropdown && activeDropdown === item.name && (
+                    <div className="pl-4">
+                      {item.dropdownItems?.map((dropdownItem) => (
+                        <Link
+                          key={dropdownItem.name}
+                          href={dropdownItem.path}
+                          className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700"
+                          onClick={() => {
+                            setActiveDropdown(null);
+                            setIsOpen(false);
+                          }}
+                        >
+                          {dropdownItem.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div className="flex items-center justify-between px-3 py-2">
+                <ThemeToggle />
+                {isAuthenticated ? (
+                  <button
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="flex items-center gap-2 font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-400"
+                  >
+                    <LogOut size={20} />
+                    {isLoggingOut ? 'Logging out...' : 'Logout'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setIsLoginModalOpen(true);
+                      setIsOpen(false);
+                    }}
+                    className="font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-400"
+                  >
+                    Login
+                  </button>
+                )}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </nav>
 
+      {/* Login Modal */}
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
       />
     </>
   );
-};
-
-export default Navbar;
+}
