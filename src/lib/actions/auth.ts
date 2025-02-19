@@ -26,34 +26,33 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 export async function signUp(formData: FormData): Promise<AuthResult> {
   try {
     const email = formData.get("email") as string;
-    const password = ID.unique(); // Generate a random password for the user
+    const name = formData.get("name") as string;
+    const password = formData.get("password") as string;
 
-    const { accountClient, account, users } = await createAdminClient();
+    const { accountClient, users } = await createAdminClient();
 
     try {
-      // First check if email exists using proper Query syntax
+      // First check if email exists
       const existingUsers = await users.list([Query.equal("email", email)]);
       
       if (existingUsers.total > 0) {
-        // If user exists, send them a login token instead
-        const otpResponse = await sendOTP(email);
         return {
-          success: true,
-          userId: otpResponse.userId,
-          email,
-          message: "We've sent a login code to your email."
+          success: false,
+          error: "An account with this email already exists. Please login instead."
         };
       }
 
-      // If email doesn't exist, create new user with random password
-      const user = await users.create(ID.unique(), email, undefined, password);
+      // Create new user with provided details
+      const user = await users.create(ID.unique(), email,undefined,password, name,);
       
-      // Send OTP immediately after user creation
+      // Create email verification
       const otpResponse = await sendOTP(email);
+      
       return { 
         success: true, 
-        userId: otpResponse.userId,
+        userId: user.$id,
         email,
+        needsVerification: true,
         message: "We've sent a verification code to your email."
       };
     } catch (error: any) {

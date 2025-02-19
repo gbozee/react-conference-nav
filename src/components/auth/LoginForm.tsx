@@ -9,7 +9,9 @@ import { useRouter, usePathname } from 'next/navigation'
 
 type ValidationErrors = {
   email?: string;
+  name?: string;
   password?: string;
+  confirmPassword?: string;
   otp?: string;
 };
 
@@ -18,6 +20,13 @@ interface VerificationState {
   userId: string | undefined;
   email: string;
   otp: string;
+}
+
+interface FormState {
+  email: string;
+  name: string;
+  password: string;
+  confirmPassword: string;
 }
 
 export default function LoginForm({ 
@@ -42,6 +51,12 @@ export default function LoginForm({
   const [otpTimer, setOtpTimer] = useState<number>(0)
   const [canResendOTP, setCanResendOTP] = useState<boolean>(true)
   const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password')
+  const [formState, setFormState] = useState<FormState>({
+    email: '',
+    name: '',
+    password: '',
+    confirmPassword: ''
+  })
   
   const router = useRouter()
   const pathname = usePathname()
@@ -70,26 +85,37 @@ export default function LoginForm({
 
   const validateForm = (formData: FormData): boolean => {
     const errors: ValidationErrors = {};
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    const otp = formData.get('otp') as string;
 
     if (!verificationState.isVerifying) {
-      if (!email) {
+      if (!formState.email) {
         errors.email = 'Email is required';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
         errors.email = 'Please enter a valid email address';
       }
 
-      if (loginMethod === 'password' && !isSignupPage) {
-        if (!password) {
+      if (isSignupPage) {
+        if (!formState.name) {
+          errors.name = 'Name is required';
+        }
+        if (!formState.password) {
+          errors.password = 'Password is required';
+        } else if (formState.password.length < 8) {
+          errors.password = 'Password must be at least 8 characters';
+        }
+        if (!formState.confirmPassword) {
+          errors.confirmPassword = 'Please confirm your password';
+        } else if (formState.confirmPassword !== formState.password) {
+          errors.confirmPassword = 'Passwords do not match';
+        }
+      } else if (loginMethod === 'password') {
+        if (!formState.password) {
           errors.password = 'Password is required';
         }
       }
     } else {
-      if (!otp) {
-        errors.otp = 'Login code is required';
-      } else if (!/^\d{6}$/.test(otp)) {
+      if (!verificationState.otp) {
+        errors.otp = 'Verification code is required';
+      } else if (!/^\d{6}$/.test(verificationState.otp)) {
         errors.otp = 'Please enter a valid 6-digit code';
       }
     }
@@ -158,7 +184,7 @@ export default function LoginForm({
           // Handle OTP verification
           const result = await verifySignUpOTP({
             userId: verificationState.userId!,
-            otp: formData.get('otp') as string
+            otp: verificationState.otp
           }, nextUrl);
 
           if (!result?.success) {
@@ -175,9 +201,19 @@ export default function LoginForm({
             }
           }
         } else {
+          // Create a new FormData instance with current form state
+          const formDataToSubmit = new FormData();
+          formDataToSubmit.append('email', formState.email);
+          if (isSignupPage) {
+            formDataToSubmit.append('name', formState.name);
+            formDataToSubmit.append('password', formState.password);
+          } else if (loginMethod === 'password') {
+            formDataToSubmit.append('password', formState.password);
+          }
+
           // Handle initial login/signup
           const action = isSignupPage ? signUp : (loginMethod === 'password' ? loginWithPassword : login);
-          const result = await action(formData);
+          const result = await action(formDataToSubmit);
           
           if (result.success) {
             if (loginMethod === 'password' && !isSignupPage) {
@@ -193,7 +229,7 @@ export default function LoginForm({
               setVerificationState({
                 isVerifying: true,
                 userId: result.userId!,
-                email: result.email || formData.get('email') as string,
+                email: result.email || formState.email,
                 otp: ''
               });
               setOtpTimer(60);
@@ -315,7 +351,7 @@ export default function LoginForm({
         </h1>
         <p className="text-gray-600 text-center">
           {isSignupPage 
-            ? 'Enter your email to create an account'
+            ? 'Enter your details to create an account'
             : 'Sign in to your account'}
         </p>
         {error && (
@@ -324,6 +360,27 @@ export default function LoginForm({
       </div>
 
       <form action={handleSubmit} className="space-y-6">
+        {isSignupPage && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Full Name
+            </label>
+            <input
+              name="name"
+              type="text"
+              value={formState.name}
+              onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
+              className={`w-full px-3 py-2 border ${
+                validationErrors.name ? 'border-red-500' : 'border-gray-300'
+              } rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900`}
+              required
+            />
+            {validationErrors.name && (
+              <p className="text-red-500 text-xs mt-1">{validationErrors.name}</p>
+            )}
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Email Address
@@ -331,6 +388,8 @@ export default function LoginForm({
           <input
             name="email"
             type="email"
+            value={formState.email}
+            onChange={(e) => setFormState(prev => ({ ...prev, email: e.target.value }))}
             className={`w-full px-3 py-2 border ${
               validationErrors.email ? 'border-red-500' : 'border-gray-300'
             } rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900`}
@@ -341,62 +400,86 @@ export default function LoginForm({
           )}
         </div>
 
-        {!isSignupPage && (
-          <>
-            {loginMethod === 'password' && (
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Password
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const emailInput = document.querySelector('input[name="email"]') as HTMLInputElement;
-                      if (emailInput?.value) {
-                        handleForgotPassword(emailInput.value);
-                      } else {
-                        setError('Please enter your email address first');
-                      }
-                    }}
-                    className="text-sm text-green-600 hover:text-green-700"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <div className="relative">
-                  <input
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    className={`w-full px-3 py-2 border ${
-                      validationErrors.password ? 'border-red-500' : 'border-gray-300'
-                    } rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900 pr-10`}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-                {validationErrors.password && (
-                  <p className="text-red-500 text-xs mt-1">{validationErrors.password}</p>
-                )}
-              </div>
-            )}
-
-            <div className="flex items-center justify-end">
+        {(isSignupPage || (!isSignupPage && loginMethod === 'password')) && (
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              {!isSignupPage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (formState.email) {
+                      handleForgotPassword(formState.email);
+                    } else {
+                      setError('Please enter your email address first');
+                    }
+                  }}
+                  className="text-sm text-green-600 hover:text-green-700"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={formState.password}
+                onChange={(e) => setFormState(prev => ({ ...prev, password: e.target.value }))}
+                className={`w-full px-3 py-2 border ${
+                  validationErrors.password ? 'border-red-500' : 'border-gray-300'
+                } rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900 pr-10`}
+                required
+              />
               <button
                 type="button"
-                onClick={() => setLoginMethod(loginMethod === 'password' ? 'otp' : 'password')}
-                className="text-sm text-green-600 hover:text-green-700"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-500"
               >
-                {loginMethod === 'password' ? 'Use one-time code' : 'Use password'}
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
-          </>
+            {validationErrors.password && (
+              <p className="text-red-500 text-xs mt-1">{validationErrors.password}</p>
+            )}
+          </div>
+        )}
+
+        {isSignupPage && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Confirm Password
+            </label>
+            <div className="relative">
+              <input
+                name="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                value={formState.confirmPassword}
+                onChange={(e) => setFormState(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                className={`w-full px-3 py-2 border ${
+                  validationErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                } rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900 pr-10`}
+                required
+              />
+            </div>
+            {validationErrors.confirmPassword && (
+              <p className="text-red-500 text-xs mt-1">{validationErrors.confirmPassword}</p>
+            )}
+          </div>
+        )}
+
+        {!isSignupPage && loginMethod === 'password' && (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setLoginMethod(loginMethod === 'password' ? 'otp' : 'password')}
+              className="text-sm text-green-600 hover:text-green-700"
+            >
+              {loginMethod === 'password' ? 'Use one-time code' : 'Use password'}
+            </button>
+          </div>
         )}
 
         <button
@@ -404,7 +487,7 @@ export default function LoginForm({
           disabled={isPending}
           className="w-full bg-[#003333] text-white py-2 rounded-md hover:bg-green-800 transition-colors font-bold disabled:opacity-50"
         >
-          {isPending ? 'Please wait...' : (loginMethod === 'password' ? 'Sign In' : 'Continue with Email')}
+          {isPending ? 'Please wait...' : (isSignupPage ? 'Create Account' : (loginMethod === 'password' ? 'Sign In' : 'Continue with Email'))}
         </button>
 
         <div className="text-center text-sm">
